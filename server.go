@@ -40,7 +40,7 @@ func Messanger(conn net.Conn, Mess chan string, user User) {
 
 func WriteLog(s string) {
 	file, _ := os.OpenFile("log.txt", os.O_WRONLY|os.O_APPEND, 0666)
-	_, err = file.WriteString(s + "\n")
+	_, err := file.WriteString(s + "\n")
 	if err != nil {
 		log.Fatal()
 	}
@@ -155,4 +155,3 @@ func main() {
 		time.Sleep(time.Second * 1)
 	}
 }
-
