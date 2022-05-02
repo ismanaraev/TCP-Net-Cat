@@ -1,123 +1,201 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"net"
 	"os"
-	"runtime"
-	"strings"
-	"sync"
-	"time"
+
+	"github.com/jroimartin/gocui"
 )
 
-type User struct {
-	username string
-}
-
-func Messanger(conn net.Conn, Mess chan string, user User) {
-	var mtx sync.Mutex
-	fmt.Println("Messanger")
-	file, _ := os.OpenFile("log.txt", os.O_WRONLY|os.O_APPEND, 0666)
-	defer file.Close()
-	for {
-		mtx.Lock()
-		message := <-Mess
-		_, err := conn.Write([]byte(message))
-		if err != nil {
-			log.Print(err)
-			usernum.Lock()
-			users--
-			usernum.Unlock()
-			mtx.Unlock()
-			fmt.Println("con closed 1")
-			return
-		}
-
-		_, err = file.WriteString(message)
-		if err != nil {
-			log.Fatal()
-		}
-		mtx.Unlock()
+func drawchat() {
+	if len(os.Args) < 3 {
+		fmt.Println("[USAGE]: nc $host $port")
+		return
 	}
-}
-
-func Writer(conn net.Conn, Mess chan string, user User) {
-	fmt.Println("Writer")
-	for {
-		data := make([]byte, 200)
-		message, err := conn.Read(data)
-		if message == 1 {
-			continue
-		}
-		if err != nil {
-			log.Print(err)
-
-			conn.Close()
-			usernum.Lock()
-			for i := 0; i < users; i++ {
-				Mess <- user.username[:len(user.username)-1] + " has left our chat..." + "\n"
-			}
-			usernum.Unlock()
-
-			fmt.Println("con closed")
-			return
-		}
-		usernum.Lock()
-		for i := 0; i < users; i++ {
-			Mess <- "[" + time.Now().Format(time.RFC822) + "][" + user.username[:len(user.username)-1] + "]:" + string(data[:message])
-		}
-		usernum.Unlock()
-	}
-}
-
-var (
-	users   int
-	usernum sync.Mutex
-)
-
-func Greet(conn net.Conn, filename string) {
-	file, _ := os.Open(filename)
-	data := make([]byte, 10000)
-	n, _ := file.Read(data)
-	for _, line := range strings.Split(string(data[:n]), "\n") {
-		conn.Write([]byte(line + "\n"))
-	}
-	file.Close()
-}
-
-func main() {
-	l, err := net.Listen("tcp", ":8989")
+	host := os.Args[1]
+	port := os.Args[2]
+	// Create a new GUI.
+	conn, err := net.Dial("tcp", host+":"+port)
 	if err != nil {
 		log.Fatal(err)
 	}
-	Mess := make(chan string)
-	os.Create("log.txt")
-	defer l.Close()
+	defer conn.Close()
+
+	data := make([]byte, 100)
+	user, _ := conn.Read(data)
+
+	var username string
 	for {
-		conn, err := l.Accept()
-		if err != nil {
-			log.Print(err)
-			continue
-		}
+		fmt.Print(string(data[:user]))
+		reader := bufio.NewReader(os.Stdin)
 
-		Greet(conn, "greeting.txt")
-		Greet(conn, "log.txt")
-		conn.Write([]byte("Your username: "))
-		data := make([]byte, 100)
-		n, err := conn.Read(data)
+		username, err = reader.ReadString('\n')
 		if err != nil {
 			log.Print(err)
 		}
-
-		user := User{username: string(data[:n])}
-		go Writer(conn, Mess, user)
-		go Messanger(conn, Mess, user)
-		Mess <- user.username[:len(user.username)-1] + " has joined our chat..." + "\n"
-		time.Sleep(time.Second)
-		usernum.Lock()
-		users++
-		usernum.Unlock()
-		fmt.Println(runtime.NumGoroutine())
+		if username != "\n" {
+			break
+		}
 	}
+	// username = strings.TrimSuffix("username", "\n")
+
+	g, err := gocui.NewGui(gocui.OutputNormal)
+	if err != nil {
+		panic(err)
+		return
+	}
+	defer g.Close()
+	g.Cursor = true
+
+	// Update the views when terminal changes size.
+	g.SetManagerFunc(func(g *gocui.Gui) error {
+		termwidth, termheight := g.Size()
+		_, err := g.SetView("output", 0, 0, termwidth-1, termheight-4)
+		if err != nil {
+			return err
+		}
+		_, err = g.SetView("input", 0, termheight-3, termwidth-1, termheight-1)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	// Terminal width and height.
+	termwidth, termheight := g.Size()
+
+	// Output.
+	ov, err := g.SetView("output", 0, 0, termwidth-1, termheight-4)
+	if err != nil && err != gocui.ErrUnknownView {
+		log.Println("Failed to create output view:", err)
+		return
+	}
+	ov.Title = " Messages  -  <" + "channel" + "> "
+
+	ov.Autoscroll = true
+	ov.Wrap = true
+
+	go func() {
+		for {
+
+			data := make([]byte, 1000)
+			n, err := conn.Read(data)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			// fmt.Println(1000)
+			// fmt.Print(string(data[:n]))
+			fmt.Fprintln(ov, string(data[:n]))
+			g.Update(func(g *gocui.Gui) error {
+				_, err := g.View("output")
+				if err != nil {
+					// handle error
+				}
+
+				return nil
+			})
+		}
+	}()
+	fmt.Fprintf(conn, username)
+	// data = make([]byte, 1000)
+	// greeting, _ := conn.Read(data)
+
+	// conn.SetReadDeadline(time.Now().Add(time.Second * 1))
+
+	// fmt.Printf(string(data[:greeting]))
+
+	// Send a welcome message.
+	// _, err = fmt.Fprintln(ov, string(data[:greeting]))
+	// if err != nil {
+	// 	log.Println("Failed to print into output view:", err)
+	// }
+	// _, err = fmt.Fprintln(ov, "<Go-Chat>: Press Ctrl-C to quit.")
+	// if err != nil {
+	// 	log.Println("Failed to print into output view:", err)
+	// }
+
+	// Input.
+	iv, err := g.SetView("input", 0, termheight-3, termwidth-1, termheight-1)
+	if err != nil && err != gocui.ErrUnknownView {
+		log.Println("Failed to create input view:", err)
+		return
+	}
+
+	iv.Title = " New Message  -  <" + username + "> "
+	iv.FgColor = gocui.ColorWhite
+	iv.Editable = true
+	err = iv.SetCursor(0, 0)
+	if err != nil {
+		log.Println("Failed to set cursor:", err)
+		return
+	}
+
+	// Bind Ctrl-C so the user can quit.
+	err = g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
+		return gocui.ErrQuit
+	})
+	if err != nil {
+		log.Println("Could not set key binding:", err)
+		return
+	}
+
+	// Bind enter key to input to send new messages.
+	err = g.SetKeybinding("input", gocui.KeyEnter, gocui.ModNone, func(g *gocui.Gui, iv *gocui.View) error {
+		// Read buffer from the beginning.
+		fmt.Fprintf(conn, iv.Buffer())
+
+		iv.Rewind()
+
+		// Get output view and print.
+		// ov, err := g.View("output")
+
+		if err != nil {
+			log.Println("Cannot get output view:", err)
+			return err
+		}
+		// _, err = fmt.Fprintf(ov, "<%s>: %s", username, iv.Buffer())
+		// if err != nil {
+		// 	log.Println("Cannot print to output view:", err)
+		// }
+
+		// Reset input.
+		iv.Clear()
+
+		// Reset cursor.
+		err = iv.SetCursor(0, 0)
+		if err != nil {
+			log.Println("Failed to set cursor:", err)
+		}
+		return err
+	})
+	if err != nil {
+		log.Println("Cannot bind the enter key:", err)
+	}
+
+	// Set the focus to input.
+	_, err = g.SetCurrentView("input")
+	if err != nil {
+		log.Println("Cannot set focus to input view:", err)
+	}
+
+	// Start the main loop.
+	err = g.MainLoop()
+	log.Println("Main loop has finished:", err)
 }
+
+func main() {
+	// Get channel and username.
+
+	// fmt.Print("Enter Desired Username: ")
+	// username, err := reader.ReadString('\n')
+	// if err != nil {
+	// 	log.Println("Could not set username:", err)
+	// }
+	// Create the GUI.
+	drawchat()
+}
+
