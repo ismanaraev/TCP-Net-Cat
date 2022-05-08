@@ -11,8 +11,8 @@ func read(conn net.Conn) {
 	for {
 		data := make([]byte, 1000)
 		n, err := conn.Read(data)
-		if err != nil {
-			return
+		if n == 0 || err != nil {
+			os.Exit(0)
 		}
 		fmt.Print(string(data[:n]))
 	}

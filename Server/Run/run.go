@@ -39,11 +39,12 @@ func Run() error {
 		go func() {
 			var ct int
 			for {
-				conn.Write([]byte("Your username: "))
+				conn.Write([]byte("[ENTER YOUR NAME]:"))
 				data := make([]byte, 100)
 				n, err := conn.Read(data)
 				if err != nil {
-					log.Print(err)
+					conn.Close()
+					return
 				}
 				fmt.Printf("n is %d", n)
 				if n != 1 {
