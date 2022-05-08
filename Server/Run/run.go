@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	chat "server/greeters"
-	"time"
 )
 
 func Run() error {
@@ -37,27 +36,34 @@ func Run() error {
 			continue
 		}
 		var user chat.User
-		for {
-			conn.Write([]byte("Your username: "))
-			data := make([]byte, 100)
-			n, err := conn.Read(data)
-			if err != nil {
-				log.Print(err)
+		go func() {
+			var ct int
+			for {
+				conn.Write([]byte("Your username: "))
+				data := make([]byte, 100)
+				n, err := conn.Read(data)
+				if err != nil {
+					log.Print(err)
+				}
+				fmt.Printf("n is %d", n)
+				if n != 1 {
+					user = chat.User{Username: string(data[:n])}
+					break
+				}
+				if ct == 2 {
+					conn.Close()
+					return
+				}
+				ct++
 			}
-			fmt.Printf("n is %d", n)
-			if n != 1 {
-				user = chat.User{Username: string(data[:n])}
-				break
-			}
-		}
-
-		chat.Greet(conn, "greeting.txt")
-		chat.Greet(conn, "log.txt")
-		go chat.Writer(conn, Mess, user)
-		go chat.Messanger(conn, Mess, user)
-		chat.Usernum.Lock()
-		chat.Users++
-		chat.Usernum.Unlock()
-		time.Sleep(time.Second * 1)
+			chat.Greet(conn, "greeting.txt")
+			chat.Greet(conn, "log.txt")
+			go chat.Writer(conn, Mess, user)
+			go chat.Messanger(conn, Mess, user)
+			chat.Usernum.Lock()
+			chat.Users++
+			chat.Usernum.Unlock()
+			//time.Sleep(time.Second * 1)
+		}()
 	}
 }
