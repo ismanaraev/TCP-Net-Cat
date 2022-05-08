@@ -23,7 +23,7 @@ func Greet(conn net.Conn, filename string) {
 		}
 	}
 
-	conn.Write([]byte(str[:len(str)-1]))
+	conn.Write([]byte(str))
 	file.Close()
 }
 

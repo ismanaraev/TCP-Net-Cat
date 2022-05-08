@@ -31,18 +31,28 @@ func Run() error {
 			log.Print(err)
 			continue
 		}
-
-		conn.Write([]byte("Your username: "))
-		data := make([]byte, 100)
-		chat.Greet(conn, "greeting.txt")
-		chat.Greet(conn, "log.txt")
-		n, err := conn.Read(data)
-		if err != nil {
-			log.Print(err)
+		if chat.Users == 10 {
+			conn.Write([]byte("Server full"))
+			conn.Close()
+			continue
+		}
+		var user chat.User
+		for {
+			conn.Write([]byte("Your username: "))
+			data := make([]byte, 100)
+			n, err := conn.Read(data)
+			if err != nil {
+				log.Print(err)
+			}
+			fmt.Printf("n is %d", n)
+			if n != 1 {
+				user = chat.User{Username: string(data[:n])}
+				break
+			}
 		}
 
-		user := chat.User{Username: string(data[:n])}
-
+		chat.Greet(conn, "greeting.txt")
+		chat.Greet(conn, "log.txt")
 		go chat.Writer(conn, Mess, user)
 		go chat.Messanger(conn, Mess, user)
 		chat.Usernum.Lock()

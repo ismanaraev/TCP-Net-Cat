@@ -16,7 +16,7 @@ func Messanger(conn net.Conn, Mess chan string, user User) {
 		message := <-Mess
 
 		// fmt.Printf("%v", message)
-		_, err := conn.Write([]byte(message))
+		_, err := conn.Write([]byte(message + "\n"))
 		if err != nil {
 			log.Print(err)
 			Usernum.Lock()
