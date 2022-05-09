@@ -1,21 +1,19 @@
 package chat
 
 import (
-	"fmt"
 	"log"
 	"net"
 	"sync"
 	"time"
 )
 
+//takes data from Writer by channel and sends it to clients
 func Messanger(conn net.Conn, Mess chan string, user User) {
 	var mtx sync.Mutex
-	fmt.Println("Messanger")
 	for {
 		mtx.Lock()
 		message := <-Mess
 
-		// fmt.Printf("%v", message)
 		_, err := conn.Write([]byte(message + "\n"))
 		if err != nil {
 			log.Print(err)
@@ -23,7 +21,6 @@ func Messanger(conn net.Conn, Mess chan string, user User) {
 			Users--
 			Usernum.Unlock()
 			mtx.Unlock()
-			fmt.Println("con closed 1")
 			return
 		}
 
@@ -32,8 +29,8 @@ func Messanger(conn net.Conn, Mess chan string, user User) {
 	}
 }
 
+//This function Takes input from client through conn and sends it to Messanger through channel
 func Writer(conn net.Conn, Mess chan string, user User) {
-	fmt.Println("Writer")
 	Usernum.Lock()
 	UserJoin := user.Username[:len(user.Username)-1] + " has joined our chat..."
 	WriteLog(UserJoin)
@@ -59,15 +56,13 @@ func Writer(conn net.Conn, Mess chan string, user User) {
 			}
 			Usernum.Unlock()
 
-			fmt.Println("con closed")
 			return
 		}
 		Usernum.Lock()
-		UserMessage := "[" + time.Now().Format(time.RFC822) + "][" + user.Username[:len(user.Username)-1] + "]:" + string(data[:message-1])
+		UserMessage := "[" + time.Now().Format("2006-01-02 15:04:05") + "][" + user.Username[:len(user.Username)-1] + "]:" + string(data[:message-1])
 		WriteLog(UserMessage)
 		for i := 0; i < Users; i++ {
 			Mess <- UserMessage
-			// fmt.Println(i)
 		}
 		Usernum.Unlock()
 	}
