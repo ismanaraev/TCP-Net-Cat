@@ -4,26 +4,13 @@ import (
 	"log"
 	"net"
 	"os"
-	"strings"
 )
 
 func Greet(conn net.Conn, filename string) {
 	file, _ := os.Open(filename)
 	data := make([]byte, 10000)
 	n, _ := file.Read(data)
-	str := ""
-	split := strings.Split(string(data[:n]), "\n")
-	for index, line := range split {
-		if index != len(split)-1 {
-			str += line + "\n"
-		} else if index > 1 {
-			str += line
-		} else {
-			str += "\n"
-		}
-	}
-
-	conn.Write([]byte(str))
+	conn.Write([]byte(data[:n]))
 	file.Close()
 }
 

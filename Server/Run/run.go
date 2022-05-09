@@ -35,6 +35,9 @@ func Run() error {
 			conn.Close()
 			continue
 		}
+		chat.Usernum.Lock()
+		chat.Users++
+		chat.Usernum.Unlock()
 		var user chat.User
 		go func() {
 			var ct int
@@ -44,15 +47,20 @@ func Run() error {
 				n, err := conn.Read(data)
 				if err != nil {
 					conn.Close()
+					chat.Usernum.Lock()
+					chat.Users--
+					chat.Usernum.Unlock()
 					return
 				}
-				fmt.Printf("n is %d", n)
 				if n != 1 {
 					user = chat.User{Username: string(data[:n])}
 					break
 				}
 				if ct == 2 {
 					conn.Close()
+					chat.Usernum.Lock()
+					chat.Users--
+					chat.Usernum.Unlock()
 					return
 				}
 				ct++
@@ -61,10 +69,6 @@ func Run() error {
 			chat.Greet(conn, "log.txt")
 			go chat.Writer(conn, Mess, user)
 			go chat.Messanger(conn, Mess, user)
-			chat.Usernum.Lock()
-			chat.Users++
-			chat.Usernum.Unlock()
-			//time.Sleep(time.Second * 1)
 		}()
 	}
 }
